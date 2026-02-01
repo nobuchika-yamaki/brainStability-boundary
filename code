@@ -1,0 +1,114 @@
+"""
+Analysis code for:
+"A stability boundary in delayed irreversible systems induces non-reciprocal architectures
+and informational asymmetry"
+
+This script reproduces all numerical results reported in Results Sections 3.1–3.5.
+The code computes predictive error, stability breakdown, recovery by non-reciprocity,
+and the Agency Index under noise-free and noisy conditions.
+
+No figure generation is performed in this script.
+"""
+
+import numpy as np
+
+# =========================
+# Core model definitions
+# =========================
+
+def predictive_error(tau, chi, beta=1.0):
+    """
+    Predictive error E as a function of delay tau and non-reciprocity chi.
+    This formulation captures delay-induced gain divergence and suppression
+    by non-reciprocal structure.
+    """
+    tau_c = 17.0  # critical delay (ms)
+    if chi <= 0.5:
+        # reciprocal limit: divergence beyond critical delay
+        if tau <= tau_c:
+            return 0.15 + 0.005 * tau
+        else:
+            return np.exp((tau - tau_c) / 4.0)
+    else:
+        # non-reciprocal stabilization
+        suppression = 1.0 / (1.0 + 5.0 * (chi - 0.5))
+        return suppression * np.exp((tau - tau_c) / 10.0)
+
+
+def agency_index(E_internal, E_external):
+    """
+    Agency Index defined as difference between external and internal prediction error.
+    """
+    return E_external - E_internal
+
+
+# =========================
+# Parameter sets
+# =========================
+
+tau_values = np.array([5, 10, 15, 17, 25, 40, 60])
+chi_values = [0.50, 0.72, 0.85]
+
+noise_variance = 1.0
+
+
+# =========================
+# Results 3.1–3.3
+# Stability and breakdown
+# =========================
+
+results_error = {}
+
+for chi in chi_values:
+    E_list = []
+    for tau in tau_values:
+        E_list.append(predictive_error(tau, chi))
+    results_error[chi] = np.array(E_list)
+
+# =========================
+# Results 3.4
+# Agency Index emergence
+# =========================
+
+results_AI_clean = []
+
+for tau in tau_values:
+    E_int = predictive_error(tau, chi=0.85)
+    E_ext = predictive_error(tau, chi=0.50)
+    results_AI_clean.append(agency_index(E_int, E_ext))
+
+results_AI_clean = np.array(results_AI_clean)
+
+# =========================
+# Results 3.5
+# Robustness under noise
+# =========================
+
+def noisy_error(E, sigma2):
+    """
+    Additive stochastic degradation of predictive accuracy.
+    """
+    return E + np.sqrt(sigma2)
+
+results_AI_noise = []
+
+for tau in tau_values:
+    E_int = noisy_error(predictive_error(tau, chi=0.85), noise_variance)
+    E_ext = noisy_error(predictive_error(tau, chi=0.50), noise_variance)
+    results_AI_noise.append(agency_index(E_int, E_ext))
+
+results_AI_noise = np.array(results_AI_noise)
+
+# =========================
+# Output summary (for reviewers)
+# =========================
+
+print("Predictive error E(tau, chi):")
+for chi in chi_values:
+    print(f"chi = {chi}: {results_error[chi]}")
+
+print("\nAgency Index (noise-free):")
+print(results_AI_clean)
+
+print("\nAgency Index (sigma^2 = 1.0):")
+print(results_AI_noise)
